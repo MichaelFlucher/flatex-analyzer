@@ -168,13 +168,18 @@ Extend `useAssetsCalc` to:
 
 #### 3.4 Tasks
 - [x] Add `/holdings/:symbol` endpoint to yf-rest_wrapper
-- [ ] Create `useETFHoldings` hook
+- [x] Create `useETFHoldings` hook
 - [ ] Integrate holdings fetching into asset calculation pipeline
-- [ ] Add caching strategy for holdings data
+- [x] Add caching strategy for holdings data
 - [ ] Handle errors gracefully (fallback to "ETF" if holdings unavailable)
 
 **Commits (yf-rest_wrapper):**
 - `2d074a0` feat(api): Add ETF holdings endpoint
+
+**Commits (flatex-analyzer):**
+- `fb71a71` feat(server): Add ETF holdings fetch function
+- `ff1f29c` feat(api): Add ETF holdings API route
+- `3b647c7` feat(hooks): Add useETFHoldingsBatch hook
 
 ---
 
