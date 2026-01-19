@@ -1,28 +1,22 @@
-import yahooFinance from "yahoo-finance2";
 import { QuoteSearchSchema } from "../types/yahoo-finance-schemas";
 import { hardCodedIsinRemap } from "../utils/remove-known-symbol-wrappers";
+import { getEnv } from "@/lib/env";
 
 export async function searchSymbol(isin: string) {
   isin = hardCodedIsinRemap(isin);
 
-  // Build the Yahoo Finance search URL
-  const yahooSearchUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(isin)}&quotesCount=10&newsCount=0&enableFuzzyQuery=false&quotesQueryId=tss_match_phrase_query&region=US`;
+  const wrapperUrl = getEnv().YAHOO_FINANCE_WRAPPER_URL;
+  const searchUrl = new URL('search', wrapperUrl);
+  searchUrl.searchParams.set('q', isin);
+  searchUrl.searchParams.set('region', 'US');
 
   console.log(`[SEARCH-SYMBOL] ================================================`);
   console.log(`[SEARCH-SYMBOL] Searching for ISIN: ${isin}`);
-  console.log(`[SEARCH-SYMBOL] Direct URL: ${yahooSearchUrl}`);
+  console.log(`[SEARCH-SYMBOL] Wrapper URL: ${searchUrl.toString()}`);
   console.log(`[SEARCH-SYMBOL] ================================================`);
 
   try {
-    // Make a direct fetch to capture the raw response
-    const response = await fetch(yahooSearchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'application/json'
-      }
-    });
-
-    // Get raw response text before parsing
+    const response = await fetch(searchUrl.toString());
     const responseText = await response.text();
 
     console.log(`[SEARCH-SYMBOL] ================================================`);
@@ -36,13 +30,11 @@ export async function searchSymbol(isin: string) {
     console.log(`[SEARCH-SYMBOL] RAW RESPONSE BODY END`);
     console.log(`[SEARCH-SYMBOL] ================================================`);
 
-    // Check if response is OK
     if (!response.ok) {
       console.error(`[SEARCH-SYMBOL] ✗ HTTP Error: ${response.status} ${response.statusText}`);
-      throw new Error(`Yahoo Finance API returned ${response.status}: ${responseText.substring(0, 200)}`);
+      throw new Error(`Wrapper service returned ${response.status}: ${responseText.substring(0, 200)}`);
     }
 
-    // Try to parse as JSON
     let searchResult;
     try {
       searchResult = JSON.parse(responseText);
@@ -50,7 +42,7 @@ export async function searchSymbol(isin: string) {
     } catch (parseError) {
       console.error(`[SEARCH-SYMBOL] ✗ Failed to parse response as JSON`);
       console.error(`[SEARCH-SYMBOL] Parse error:`, parseError);
-      throw new Error(`Yahoo Finance returned non-JSON response: ${responseText.substring(0, 200)}`);
+      throw new Error(`Wrapper returned non-JSON response: ${responseText.substring(0, 200)}`);
     }
 
     console.log(`[SEARCH-SYMBOL] Search result structure:`, JSON.stringify(searchResult, null, 2));
