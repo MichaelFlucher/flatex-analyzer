@@ -6,6 +6,7 @@ import {
 } from "./use-depot-item-details";
 import { usePriceHistory } from "./use-price-history";
 import { useTickerDatas } from "./use-ticker-data";
+import { useETFHoldingsBatch } from "./use-etf-holdings";
 import { convertToEuroPrice } from "../utils/euro-price-conversion";
 import { Asset } from "../types/asset";
 import { DepotItem } from "../types/depot-item";
@@ -14,6 +15,7 @@ import { ISO_FORMAT } from "../utils/date-parse";
 function getProgressState(
   conversionRatesIsLoading: boolean,
   tickerDataProgress: number,
+  etfHoldingsProgress: number,
   priceHistoryIsLoading: boolean
 ): ProgressDetails {
   if (conversionRatesIsLoading) {
@@ -27,8 +29,16 @@ function getProgressState(
   if (tickerDataProgress < 1) {
     return {
       state: ProgressState.FETCHING_TICKER_DATA,
-      progress: Math.max(tickerDataProgress * 0.75, 0),
+      progress: Math.max(tickerDataProgress * 0.6, 0),
       message: "Fetching ticker data...",
+    };
+  }
+
+  if (etfHoldingsProgress < 1) {
+    return {
+      state: ProgressState.FETCHING_ETF_HOLDINGS,
+      progress: 0.6 + etfHoldingsProgress * 0.15,
+      message: "Fetching ETF holdings...",
     };
   }
 
@@ -50,6 +60,7 @@ function getProgressState(
 export enum ProgressState {
   FETCHING_CONVERSION_RATES = "FETCHING_CONVERSION_RATES",
   FETCHING_TICKER_DATA = "FETCHING_TICKER_DATA",
+  FETCHING_ETF_HOLDINGS = "FETCHING_ETF_HOLDINGS",
   FETCHING_PRICE_HISTORY = "FETCHING_PRICE_HISTORY",
   COMPLETED = "COMPLETED",
 }
@@ -143,6 +154,17 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
     mergedAssets.map((item) => item.isin)
   );
 
+  // Prepare ETF holdings queries - only for assets with ETF quoteType
+  const etfHoldingsQueries = mergedAssets.map((asset) => {
+    const tickerItem = data.find((d) => d.isin === asset.isin);
+    const isETF = tickerItem?.tickerData?.quoteType === "ETF";
+    const symbol = tickerItem?.tickerData?.symbol ?? "";
+    return { symbol, isETF };
+  });
+
+  const { data: etfHoldingsData, progress: etfHoldingsProgress } =
+    useETFHoldingsBatch(etfHoldingsQueries);
+
   const assets: Asset[] = mergedAssets.map((asset) => {
     const item = data.find((d) => d.isin === asset.isin);
     const priceDataAvailable =
@@ -157,11 +179,19 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
     let currentPositionValue = priceDataAvailable
       ? asset.details.quantity * currentEuroPrice
       : null;
+
+    // Find ETF holdings for this asset if it's an ETF
+    const symbol = item?.tickerData?.symbol;
+    const etfHoldings = symbol
+      ? etfHoldingsData.find((h) => h.symbol === symbol)?.holdings
+      : null;
+
     return {
       ...asset,
       tickerData: item?.tickerData ?? null,
       currentEuroPrice,
       currentPositionValue,
+      etfHoldings: etfHoldings ?? undefined,
     };
   });
 
@@ -234,6 +264,7 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
     progress: getProgressState(
       conversionRatesIsLoading,
       tickerDataProgress,
+      etfHoldingsProgress,
       priceHistoryIsLoading
     ),
     assets,
