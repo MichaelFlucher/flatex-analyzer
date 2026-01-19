@@ -4,32 +4,57 @@ import { hardCodedIsinRemap } from "../utils/remove-known-symbol-wrappers";
 
 export async function searchSymbol(isin: string) {
   isin = hardCodedIsinRemap(isin);
-  const originalFetch = global.fetch;
 
-  // Intercept fetch to log the raw response from Yahoo
-  global.fetch = async (input, init) => {
-    console.log(`[YAHOO-FETCH] Requesting: ${input}`);
-    console.log(`[YAHOO-FETCH] Request headers:`, JSON.stringify(init?.headers || {}));
-    try {
-      const response = await originalFetch(input, init);
-      const clone = response.clone();
-      const text = await clone.text();
-      console.log(`[YAHOO-FETCH] Response status: ${response.status} ${response.statusText}`);
-      console.log(`[YAHOO-FETCH] Response headers:`, JSON.stringify(Object.fromEntries(response.headers.entries())));
-      console.log(`[YAHOO-FETCH] Response body (full):`, text);
-      return response;
-    } catch (err) {
-      console.error("[YAHOO-FETCH] ✗ Network error:", err);
-      throw err;
-    }
-  };
+  // Build the Yahoo Finance search URL
+  const yahooSearchUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(isin)}&quotesCount=10&newsCount=0&enableFuzzyQuery=false&quotesQueryId=tss_match_phrase_query&region=US`;
+
+  console.log(`[SEARCH-SYMBOL] ================================================`);
+  console.log(`[SEARCH-SYMBOL] Searching for ISIN: ${isin}`);
+  console.log(`[SEARCH-SYMBOL] Direct URL: ${yahooSearchUrl}`);
+  console.log(`[SEARCH-SYMBOL] ================================================`);
 
   try {
-    console.log(`[SEARCH-SYMBOL] Calling yahooFinance.search for ISIN: ${isin}`);
-    const searchResult = await yahooFinance.search(isin, {
-      region: "US",
+    // Make a direct fetch to capture the raw response
+    const response = await fetch(yahooSearchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'application/json'
+      }
     });
-    console.log(`[SEARCH-SYMBOL] ✓ Search result for ISIN ${isin}:`, JSON.stringify(searchResult, null, 2));
+
+    // Get raw response text before parsing
+    const responseText = await response.text();
+
+    console.log(`[SEARCH-SYMBOL] ================================================`);
+    console.log(`[SEARCH-SYMBOL] Response Status: ${response.status} ${response.statusText}`);
+    console.log(`[SEARCH-SYMBOL] Response Headers:`, JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+    console.log(`[SEARCH-SYMBOL] Response Content-Type: ${response.headers.get('content-type')}`);
+    console.log(`[SEARCH-SYMBOL] Response Body Length: ${responseText.length} bytes`);
+    console.log(`[SEARCH-SYMBOL] ================================================`);
+    console.log(`[SEARCH-SYMBOL] RAW RESPONSE BODY START:`);
+    console.log(responseText);
+    console.log(`[SEARCH-SYMBOL] RAW RESPONSE BODY END`);
+    console.log(`[SEARCH-SYMBOL] ================================================`);
+
+    // Check if response is OK
+    if (!response.ok) {
+      console.error(`[SEARCH-SYMBOL] ✗ HTTP Error: ${response.status} ${response.statusText}`);
+      throw new Error(`Yahoo Finance API returned ${response.status}: ${responseText.substring(0, 200)}`);
+    }
+
+    // Try to parse as JSON
+    let searchResult;
+    try {
+      searchResult = JSON.parse(responseText);
+      console.log(`[SEARCH-SYMBOL] ✓ Successfully parsed JSON response`);
+    } catch (parseError) {
+      console.error(`[SEARCH-SYMBOL] ✗ Failed to parse response as JSON`);
+      console.error(`[SEARCH-SYMBOL] Parse error:`, parseError);
+      throw new Error(`Yahoo Finance returned non-JSON response: ${responseText.substring(0, 200)}`);
+    }
+
+    console.log(`[SEARCH-SYMBOL] Search result structure:`, JSON.stringify(searchResult, null, 2));
+
     const match = searchResult.quotes?.[0];
 
     if (!match) {
@@ -49,23 +74,11 @@ export async function searchSymbol(isin: string) {
     return parsed.data.symbol;
   } catch (error: any) {
     console.error(`[SEARCH-SYMBOL] ✗ Error in searchSymbol for ISIN: ${isin}`);
-    if (error instanceof SyntaxError) {
-      console.error(
-        "[SEARCH-SYMBOL] SyntaxError in yahooFinance.search. This usually means a non-JSON response from Yahoo."
-      );
+    console.error(`[SEARCH-SYMBOL] Error name: ${error.name}`);
+    console.error(`[SEARCH-SYMBOL] Error message: ${error.message}`);
+    if (error.stack) {
+      console.error(`[SEARCH-SYMBOL] Error stack:`, error.stack);
     }
-    // Try to log extra properties if yahoo-finance2 attaches them
-    const errorDetails = Object.getOwnPropertyNames(error).reduce((acc, key) => {
-      acc[key] = (error as any)[key];
-      return acc;
-    }, {} as any);
-    console.error(
-      "[SEARCH-SYMBOL] Error details:",
-      JSON.stringify(errorDetails, null, 2)
-    );
     throw error;
-  } finally {
-    // Restore original fetch
-    global.fetch = originalFetch;
   }
 }
