@@ -32,6 +32,7 @@ services:
       dockerfile: Dockerfile.migrate
     container_name: migrate
     working_dir: /app
+    restart: "no"
     depends_on:
       - pg-data
 
