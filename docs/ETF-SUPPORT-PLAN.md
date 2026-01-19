@@ -263,11 +263,16 @@ function getSectorPieData(items: Asset[]): ChartData[] {
 ```
 
 #### 4.3 Tasks
-- [ ] Create `etf-aggregation.ts` utility functions
-- [ ] Update `getSectorPieData` to handle ETF holdings
-- [ ] Update `getCountryPieData` to handle ETF holdings
-- [ ] Add unit tests for aggregation logic
-- [ ] Handle edge cases (missing data, rounding errors)
+- [x] Create `etf-aggregation.ts` utility functions
+- [x] Update `getSectorPieData` to handle ETF holdings
+- [x] Update `getCountryPieData` to handle ETF holdings
+- [ ] Add unit tests for aggregation logic (future)
+- [x] Handle edge cases (missing data, rounding errors)
+
+**Commits:**
+- `21b09b3` feat(utils): Add ETF aggregation utility functions
+- `783aa01` feat(chart): Update getSectorPieData for ETF sector breakdown
+- `a9bf2f6` feat(chart): Update getCountryPieData for ETF support
 
 ---
 
@@ -387,3 +392,42 @@ export const etfHoldingsCache = pgTable('etf_holdings_cache', {
 
 4. Should users be able to override/edit ETF holdings manually?
    - Recommendation: Future enhancement, not in initial scope
+
+---
+
+## Implementation Status
+
+### Completed (Core Feature)
+- [x] **Phase 1**: Data source research - Using yfinance `funds_data.sector_weightings`
+- [x] **Phase 2**: Type definitions - `ETFHolding`, `SectorWeight`, `ETFHoldingsData`
+- [x] **Phase 3**: Data fetching pipeline - API endpoint, hook, integration
+- [x] **Phase 4**: Sector aggregation - ETFs now show weighted sector breakdown
+
+### Partially Implemented
+- [ ] **Country breakdown**: Yahoo Finance doesn't provide country data for ETF holdings
+  - Currently shows "ETF" for country (same as before)
+  - Structure in place for future enhancement when data source available
+
+### Future Enhancements (Phase 5-6)
+- [ ] ETF details page with holdings list
+- [ ] Toggle for ETF breakdown mode in settings
+- [ ] Database caching for holdings (currently in-memory via React Query)
+- [ ] Unit tests for aggregation functions
+
+### Commit History (flatex-analyzer)
+```
+570ecf1 feat(types): Add ETF holdings type definitions
+6afaac4 feat(types): Extend Asset interface with etfHoldings
+fb71a71 feat(server): Add ETF holdings fetch function
+ff1f29c feat(api): Add ETF holdings API route
+3b647c7 feat(hooks): Add useETFHoldingsBatch hook
+fd4bd4f feat(hooks): Integrate ETF holdings into asset calculation
+21b09b3 feat(utils): Add ETF aggregation utility functions
+783aa01 feat(chart): Update getSectorPieData for ETF sector breakdown
+a9bf2f6 feat(chart): Update getCountryPieData for ETF support
+```
+
+### Commit History (yf-rest_wrapper)
+```
+2d074a0 feat(api): Add ETF holdings endpoint
+```
