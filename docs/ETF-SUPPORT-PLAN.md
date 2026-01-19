@@ -167,11 +167,14 @@ Extend `useAssetsCalc` to:
 3. Attach holdings data to Asset objects
 
 #### 3.4 Tasks
-- [ ] Add `/holdings/:symbol` endpoint to yf-rest_wrapper
+- [x] Add `/holdings/:symbol` endpoint to yf-rest_wrapper
 - [ ] Create `useETFHoldings` hook
 - [ ] Integrate holdings fetching into asset calculation pipeline
 - [ ] Add caching strategy for holdings data
 - [ ] Handle errors gracefully (fallback to "ETF" if holdings unavailable)
+
+**Commits (yf-rest_wrapper):**
+- `2d074a0` feat(api): Add ETF holdings endpoint
 
 ---
 
