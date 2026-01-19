@@ -4,6 +4,25 @@ import { hardCodedIsinRemap } from "../utils/remove-known-symbol-wrappers";
 
 export async function searchSymbol(isin: string) {
   isin = hardCodedIsinRemap(isin);
+  const originalFetch = global.fetch;
+
+  // Intercept fetch to log the raw response from Yahoo
+  global.fetch = async (input, init) => {
+    console.log(`[Debug Fetch] Requesting: ${input}`);
+    try {
+      const response = await originalFetch(input, init);
+      const clone = response.clone();
+      const text = await clone.text();
+      console.log(
+        `[Debug Fetch] Response status: ${response.status}. Body preview (first 500 chars): ${text.substring(0, 500)}`
+      );
+      return response;
+    } catch (err) {
+      console.error("[Debug Fetch] Network error:", err);
+      throw err;
+    }
+  };
+
   try {
     const searchResult = await yahooFinance.search(isin, {
       region: "US",
@@ -31,5 +50,8 @@ export async function searchSymbol(isin: string) {
       JSON.stringify(error, Object.getOwnPropertyNames(error))
     );
     throw error;
+  } finally {
+    // Restore original fetch
+    global.fetch = originalFetch;
   }
 }
