@@ -118,9 +118,13 @@ export interface Asset extends DepotItem {
 ```
 
 #### 2.3 Tasks
-- [ ] Create `etf-holdings.ts` type definitions
-- [ ] Update `Asset` interface to include optional ETF holdings
-- [ ] Add Zod schemas for runtime validation
+- [x] Create `etf-holdings.ts` type definitions
+- [x] Update `Asset` interface to include optional ETF holdings
+- [x] Add Zod schemas for runtime validation
+
+**Commits:**
+- `570ecf1` feat(types): Add ETF holdings type definitions
+- `6afaac4` feat(types): Extend Asset interface with etfHoldings
 
 ---
 
