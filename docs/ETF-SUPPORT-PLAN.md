@@ -50,10 +50,22 @@ Show weighted sector and country breakdowns for ETFs based on their underlying h
 **Recommendation**: Start with Yahoo Finance (`topHoldings` module) as it integrates with existing infrastructure. Fall back to manual data for ETFs where Yahoo data is insufficient.
 
 #### 1.2 Tasks
-- [ ] Test Yahoo Finance `quoteSummary` endpoint with `topHoldings` module
-- [ ] Evaluate data quality for common ETFs (MSCI World, S&P 500, etc.)
-- [ ] Document available fields: holding symbol, percentage weight, sector, country
-- [ ] Decide on fallback strategy for incomplete data
+- [x] Test Yahoo Finance `quoteSummary` endpoint with `topHoldings` module
+- [x] Evaluate data quality for common ETFs (MSCI World, S&P 500, etc.)
+- [x] Document available fields: holding symbol, percentage weight, sector, country
+- [x] Decide on fallback strategy for incomplete data
+
+#### 1.3 Research Findings (Completed)
+
+**yfinance Library Properties for ETF/Funds:**
+- `ticker.funds_data.top_holdings` - Top holdings with symbol, name, percentage
+- `ticker.funds_data.sector_weightings` - Pre-aggregated sector breakdown (dict)
+- `ticker.funds_data.equity_holdings` - Equity holding statistics
+
+**Decision:** Use `yfinance` library directly (already in use by yf-rest_wrapper).
+- Primary: Use `sector_weightings` for sector breakdown (pre-aggregated by Yahoo)
+- Secondary: Use `top_holdings` for individual holding details
+- Fallback: Show "ETF" category if no data available
 
 ---
 
