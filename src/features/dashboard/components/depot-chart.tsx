@@ -57,9 +57,25 @@ function getCountryPieData(items: Asset[]) {
   for (const item of items) {
     if (!item.currentPositionValue) continue;
     const isETF = item.tickerData?.quoteType === "ETF";
-    const country = isETF ? "ETF" : item.tickerData?.country ?? "Missing Country Data";
-    countryMap[country] =
-      (countryMap[country] ?? 0) + item.currentPositionValue;
+
+    if (isETF && item.etfHoldings) {
+      // Use ETF country breakdown (currently returns "ETF" as Yahoo Finance
+      // doesn't provide country data; structure ready for future enhancement)
+      const breakdown = getETFCountryBreakdown(
+        item.currentPositionValue,
+        item.etfHoldings
+      );
+      for (const [country, value] of breakdown) {
+        countryMap[country] = (countryMap[country] ?? 0) + value;
+      }
+    } else if (isETF) {
+      // ETF without holdings data - fallback to "ETF" category
+      countryMap["ETF"] = (countryMap["ETF"] ?? 0) + item.currentPositionValue;
+    } else {
+      // Regular stock - use direct country
+      const country = item.tickerData?.country ?? "Missing Country Data";
+      countryMap[country] = (countryMap[country] ?? 0) + item.currentPositionValue;
+    }
   }
 
   return Object.entries(countryMap)
