@@ -1,5 +1,9 @@
 import { Asset } from "../types/asset";
 import { PieChartSwitcher } from "./pie-chart-switcher";
+import {
+  getETFSectorBreakdown,
+  getETFCountryBreakdown,
+} from "../utils/etf-aggregation";
 
 function getAssetPieData(items: Asset[]) {
   return items
@@ -18,8 +22,24 @@ function getSectorPieData(items: Asset[]) {
   for (const item of items) {
     if (!item.currentPositionValue) continue;
     const isETF = item.tickerData?.quoteType === "ETF";
-    const sector = isETF ? "ETF" : item.tickerData?.sector ?? "Missing Sector Data";
-    sectorMap[sector] = (sectorMap[sector] ?? 0) + item.currentPositionValue;
+
+    if (isETF && item.etfHoldings) {
+      // Distribute ETF value across sectors based on holdings
+      const breakdown = getETFSectorBreakdown(
+        item.currentPositionValue,
+        item.etfHoldings
+      );
+      for (const [sector, value] of breakdown) {
+        sectorMap[sector] = (sectorMap[sector] ?? 0) + value;
+      }
+    } else if (isETF) {
+      // ETF without holdings data - fallback to "ETF" category
+      sectorMap["ETF"] = (sectorMap["ETF"] ?? 0) + item.currentPositionValue;
+    } else {
+      // Regular stock - use direct sector
+      const sector = item.tickerData?.sector ?? "Missing Sector Data";
+      sectorMap[sector] = (sectorMap[sector] ?? 0) + item.currentPositionValue;
+    }
   }
 
   return Object.entries(sectorMap)
