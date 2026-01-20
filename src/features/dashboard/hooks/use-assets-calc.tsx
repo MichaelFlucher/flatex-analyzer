@@ -159,7 +159,7 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
     const tickerItem = data.find((d) => d.isin === asset.isin);
     const isETF = tickerItem?.tickerData?.quoteType === "ETF";
     const symbol = tickerItem?.tickerData?.symbol ?? "";
-    return { symbol, isETF };
+    return { symbol, isin: asset.isin, isETF };
   });
 
   const { data: etfHoldingsData, progress: etfHoldingsProgress } =

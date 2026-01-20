@@ -2,12 +2,15 @@ import { useQueries } from "@tanstack/react-query";
 import { ETFHoldingsData } from "../types/etf-holdings";
 
 async function fetchETFHoldings(
-  symbol: string
+  symbol: string,
+  isin?: string
 ): Promise<ETFHoldingsData | null> {
   try {
-    const res = await fetch(
-      `/api/etf-holdings?symbol=${encodeURIComponent(symbol)}`
-    );
+    const params = new URLSearchParams({ symbol });
+    if (isin) {
+      params.set('isin', isin);
+    }
+    const res = await fetch(`/api/etf-holdings?${params.toString()}`);
     if (!res.ok) {
       console.warn(`ETF holdings not available for ${symbol}`);
       return null;
@@ -23,6 +26,7 @@ async function fetchETFHoldings(
 
 interface ETFHoldingsQuery {
   symbol: string;
+  isin: string;
   isETF: boolean;
 }
 
@@ -32,7 +36,7 @@ interface ETFHoldingsQuery {
  */
 export function useETFHoldingsBatch(queries: ETFHoldingsQuery[]) {
   const { data, progress } = useQueries({
-    queries: queries.map(({ symbol, isETF }) => ({
+    queries: queries.map(({ symbol, isin, isETF }) => ({
       queryKey: ["etf-holdings", symbol],
       queryFn: async (): Promise<{
         symbol: string;
@@ -41,7 +45,7 @@ export function useETFHoldingsBatch(queries: ETFHoldingsQuery[]) {
         if (!isETF) {
           return { symbol, holdings: null };
         }
-        const holdings = await fetchETFHoldings(symbol);
+        const holdings = await fetchETFHoldings(symbol, isin);
         return { symbol, holdings };
       },
       staleTime: 24 * 60 * 60 * 1000, // Cache for 24 hours

@@ -5,6 +5,7 @@ import { cache } from "@/lib/cache";
 
 const QuerySchema = z.object({
   symbol: z.string().min(1).max(20),
+  isin: z.string().min(8).max(12).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { symbol } = parsedQuery.data;
+  const { symbol, isin } = parsedQuery.data;
   const cacheKey = `etf-holdings:${symbol}`;
 
   // Check cache first
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
   console.log(`[ETF-HOLDINGS] Cache miss for symbol: ${symbol}. Fetching...`);
 
   try {
-    const holdings = await fetchETFHoldings(symbol);
+    const holdings = await fetchETFHoldings(symbol, isin);
 
     if (!holdings) {
       console.log(`[ETF-HOLDINGS] No holdings data for symbol: ${symbol}`);

@@ -2,13 +2,19 @@ import { getEnv } from "../../../lib/env";
 import { ETFHoldingsData, ETFHoldingsDataSchema } from "../types/etf-holdings";
 
 export async function fetchETFHoldings(
-  symbol: string
+  symbol: string,
+  isin?: string
 ): Promise<ETFHoldingsData | null> {
-  console.log(`fetchETFHoldings called for symbol: ${symbol}`);
+  console.log(`fetchETFHoldings called for symbol: ${symbol}${isin ? `, isin: ${isin}` : ''}`);
   const url = new URL(
     `stock/${symbol}/holdings`,
     getEnv().YAHOO_FINANCE_WRAPPER_URL
   );
+
+  // Pass ISIN to avoid lookup in the wrapper
+  if (isin) {
+    url.searchParams.set('isin', isin);
+  }
 
   try {
     const response = await fetch(url.toString());
