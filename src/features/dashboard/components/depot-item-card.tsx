@@ -139,6 +139,9 @@ export function DepotItemCard({ item, baseUrl = "/assets" }: { item: Asset, base
                   {item.name}
                 </Typography>
               </Stack>
+              <Typography variant="caption" color="text.secondary">
+                {item.tickerData?.symbol ?? "—"} · {item.isin}
+              </Typography>
             </Stack>
 
             <Divider sx={{ mb: 1 }} />
