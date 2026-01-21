@@ -1,6 +1,110 @@
 import { QuoteSearchSchema } from "../types/yahoo-finance-schemas";
 import { hardCodedIsinRemap } from "../utils/remove-known-symbol-wrappers";
 import { getEnv } from "@/lib/env";
+import { z } from "zod";
+
+// Exchange priority lists based on ISIN country code
+// EU ISINs should prefer European exchanges, US ISINs should prefer US exchanges
+const EU_PRIORITY_EXCHANGES = [
+  'GER',  // XETRA (Germany)
+  'FRA',  // Frankfurt
+  'STU',  // Stuttgart
+  'DUS',  // Düsseldorf
+  'MUN',  // Munich
+  'HAM',  // Hamburg
+  'BER',  // Berlin
+  'LSE',  // London
+  'PAR',  // Paris (Euronext)
+  'AMS',  // Amsterdam (Euronext)
+  'BRU',  // Brussels (Euronext)
+  'LIS',  // Lisbon (Euronext)
+  'MIL',  // Milan
+  'SWX',  // Swiss Exchange
+  'VIE',  // Vienna
+  'MCE',  // Madrid
+];
+
+const US_PRIORITY_EXCHANGES = [
+  'NYQ',  // NYSE
+  'NMS',  // NASDAQ
+  'NGM',  // NASDAQ Global Market
+  'PCX',  // NYSE Arca
+  'BTS',  // BATS
+  'NYS',  // NYSE
+  'NAS',  // NASDAQ
+];
+
+// EU country codes (first 2 chars of ISIN)
+const EU_COUNTRY_CODES = [
+  'IE',  // Ireland
+  'DE',  // Germany
+  'FR',  // France
+  'NL',  // Netherlands
+  'LU',  // Luxembourg
+  'GB',  // United Kingdom
+  'AT',  // Austria
+  'BE',  // Belgium
+  'ES',  // Spain
+  'IT',  // Italy
+  'PT',  // Portugal
+  'CH',  // Switzerland
+  'SE',  // Sweden
+  'DK',  // Denmark
+  'NO',  // Norway
+  'FI',  // Finland
+];
+
+const US_COUNTRY_CODES = ['US'];
+
+/**
+ * Determines the priority exchanges based on the ISIN country code.
+ * EU ISINs prefer European exchanges, US ISINs prefer US exchanges.
+ */
+function getPriorityExchanges(isin: string): string[] {
+  const countryCode = isin.substring(0, 2).toUpperCase();
+
+  if (EU_COUNTRY_CODES.includes(countryCode)) {
+    return EU_PRIORITY_EXCHANGES;
+  }
+  if (US_COUNTRY_CODES.includes(countryCode)) {
+    return US_PRIORITY_EXCHANGES;
+  }
+
+  // Default: try EU first (since this is a flatex analyzer, EU is more common)
+  return [...EU_PRIORITY_EXCHANGES, ...US_PRIORITY_EXCHANGES];
+}
+
+/**
+ * Selects the best quote from search results based on exchange priority.
+ * Prioritizes exchanges based on ISIN origin (EU vs US).
+ */
+function selectBestQuote(quotes: z.infer<typeof QuoteSearchSchema>[], isin: string): z.infer<typeof QuoteSearchSchema> | null {
+  if (!quotes || quotes.length === 0) {
+    return null;
+  }
+
+  const priorityExchanges = getPriorityExchanges(isin);
+
+  console.log(`[SEARCH-SYMBOL] ISIN country code: ${isin.substring(0, 2)}`);
+  console.log(`[SEARCH-SYMBOL] Priority exchanges: ${priorityExchanges.slice(0, 5).join(', ')}...`);
+  console.log(`[SEARCH-SYMBOL] Available quotes:`);
+  quotes.forEach((q, i) => {
+    console.log(`[SEARCH-SYMBOL]   ${i}: ${q.symbol} (exchange: ${q.exchange}, type: ${q.quoteType})`);
+  });
+
+  // Try each priority exchange in order
+  for (const exchange of priorityExchanges) {
+    const match = quotes.find(q => q.exchange === exchange);
+    if (match) {
+      console.log(`[SEARCH-SYMBOL] Selected ${match.symbol} from priority exchange ${exchange}`);
+      return match;
+    }
+  }
+
+  // Fallback: return first quote if no priority exchange found
+  console.log(`[SEARCH-SYMBOL] No priority exchange found, using first result: ${quotes[0].symbol}`);
+  return quotes[0];
+}
 
 export async function searchSymbol(isin: string) {
   isin = hardCodedIsinRemap(isin);
@@ -47,23 +151,37 @@ export async function searchSymbol(isin: string) {
 
     console.log(`[SEARCH-SYMBOL] Search result structure:`, JSON.stringify(searchResult, null, 2));
 
-    const match = searchResult.quotes?.[0];
+    const rawQuotes = searchResult.quotes || [];
 
-    if (!match) {
+    if (rawQuotes.length === 0) {
       console.error(`[SEARCH-SYMBOL] ✗ No quotes found in search result for ISIN: ${isin}`);
       throw new Error("No quotes found for ISIN");
     }
 
-    console.log(`[SEARCH-SYMBOL] First quote match:`, JSON.stringify(match, null, 2));
+    // Parse all quotes
+    const validQuotes: z.infer<typeof QuoteSearchSchema>[] = [];
+    for (const rawQuote of rawQuotes) {
+      const parsed = QuoteSearchSchema.safeParse(rawQuote);
+      if (parsed.success) {
+        validQuotes.push(parsed.data);
+      }
+    }
 
-    const parsed = QuoteSearchSchema.safeParse(match);
-    if (!parsed.success) {
-      console.error(`[SEARCH-SYMBOL] ✗ Failed to parse search result for ISIN ${isin}:`, parsed.error.format());
+    if (validQuotes.length === 0) {
+      console.error(`[SEARCH-SYMBOL] ✗ No valid quotes found in search result for ISIN: ${isin}`);
+      throw new Error("No valid quotes found for ISIN");
+    }
+
+    // Select the best quote based on exchange priority
+    const bestQuote = selectBestQuote(validQuotes, isin);
+
+    if (!bestQuote) {
+      console.error(`[SEARCH-SYMBOL] ✗ Failed to select a quote for ISIN ${isin}`);
       throw new Error("No valid quote found for ISIN");
     }
 
-    console.log(`[SEARCH-SYMBOL] ✓ Parsed symbol: ${parsed.data.symbol}`);
-    return parsed.data.symbol;
+    console.log(`[SEARCH-SYMBOL] ✓ Selected symbol: ${bestQuote.symbol} (exchange: ${bestQuote.exchange})`);
+    return bestQuote.symbol;
   } catch (error: any) {
     console.error(`[SEARCH-SYMBOL] ✗ Error in searchSymbol for ISIN: ${isin}`);
     console.error(`[SEARCH-SYMBOL] Error name: ${error.name}`);
