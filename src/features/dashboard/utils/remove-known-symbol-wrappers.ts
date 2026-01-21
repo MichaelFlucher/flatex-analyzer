@@ -13,8 +13,9 @@ export function removeKnownSymbolWrappers(symbol: string): string {
 }
 
 
-const ISIN_REMAP = {
-  "US02079K3059": "GOOGL"
+const ISIN_REMAP: Record<string, string> = {
+  "US02079K3059": "GOOGL",
+  "IE00BQT3WG13": "36BZ.DE",  // iShares MSCI China A UCITS ETF - Yahoo ISIN search only returns Mexican ticker
 }
 
 export function hardCodedIsinRemap(symbol: string): string {
