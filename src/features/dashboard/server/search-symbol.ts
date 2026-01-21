@@ -75,12 +75,12 @@ function getPriorityExchanges(isin: string): string[] {
 }
 
 /**
- * Selects the best quote from search results based on exchange priority.
- * Prioritizes exchanges based on ISIN origin (EU vs US).
+ * Sorts quotes by exchange priority.
+ * Returns all quotes sorted with priority exchanges first, then remaining exchanges.
  */
-function selectBestQuote(quotes: z.infer<typeof QuoteSearchSchema>[], isin: string): z.infer<typeof QuoteSearchSchema> | null {
+function sortQuotesByPriority(quotes: z.infer<typeof QuoteSearchSchema>[], isin: string): z.infer<typeof QuoteSearchSchema>[] {
   if (!quotes || quotes.length === 0) {
-    return null;
+    return [];
   }
 
   const priorityExchanges = getPriorityExchanges(isin);
@@ -92,18 +92,39 @@ function selectBestQuote(quotes: z.infer<typeof QuoteSearchSchema>[], isin: stri
     console.log(`[SEARCH-SYMBOL]   ${i}: ${q.symbol} (exchange: ${q.exchange}, type: ${q.quoteType})`);
   });
 
-  // Try each priority exchange in order
+  // Sort: priority exchanges first (in order), then remaining quotes
+  const sortedQuotes: z.infer<typeof QuoteSearchSchema>[] = [];
+  const usedSymbols = new Set<string>();
+
+  // First, add quotes from priority exchanges in order
   for (const exchange of priorityExchanges) {
-    const match = quotes.find(q => q.exchange === exchange);
+    const match = quotes.find(q => q.exchange === exchange && !usedSymbols.has(q.symbol));
     if (match) {
-      console.log(`[SEARCH-SYMBOL] Selected ${match.symbol} from priority exchange ${exchange}`);
-      return match;
+      sortedQuotes.push(match);
+      usedSymbols.add(match.symbol);
+      console.log(`[SEARCH-SYMBOL] Priority ${sortedQuotes.length}: ${match.symbol} (exchange: ${exchange})`);
     }
   }
 
-  // Fallback: return first quote if no priority exchange found
-  console.log(`[SEARCH-SYMBOL] No priority exchange found, using first result: ${quotes[0].symbol}`);
-  return quotes[0];
+  // Then, add remaining quotes that weren't matched by priority
+  for (const quote of quotes) {
+    if (!usedSymbols.has(quote.symbol)) {
+      sortedQuotes.push(quote);
+      usedSymbols.add(quote.symbol);
+      console.log(`[SEARCH-SYMBOL] Fallback ${sortedQuotes.length}: ${quote.symbol} (exchange: ${quote.exchange})`);
+    }
+  }
+
+  return sortedQuotes;
+}
+
+/**
+ * Selects the best quote from search results based on exchange priority.
+ * Prioritizes exchanges based on ISIN origin (EU vs US).
+ */
+function selectBestQuote(quotes: z.infer<typeof QuoteSearchSchema>[], isin: string): z.infer<typeof QuoteSearchSchema> | null {
+  const sorted = sortQuotesByPriority(quotes, isin);
+  return sorted.length > 0 ? sorted[0] : null;
 }
 
 export async function searchSymbol(isin: string) {
@@ -189,6 +210,78 @@ export async function searchSymbol(isin: string) {
     if (error.stack) {
       console.error(`[SEARCH-SYMBOL] Error stack:`, error.stack);
     }
+    throw error;
+  }
+}
+
+export interface SymbolSearchResult {
+  primarySymbol: string;
+  allSymbols: string[];
+}
+
+/**
+ * Searches for all symbols matching an ISIN, sorted by exchange priority.
+ * Returns the primary (best) symbol and all alternative symbols.
+ */
+export async function searchAllSymbols(isin: string): Promise<SymbolSearchResult> {
+  isin = hardCodedIsinRemap(isin);
+
+  const wrapperUrl = getEnv().YAHOO_FINANCE_WRAPPER_URL;
+  const searchUrl = new URL('search', wrapperUrl);
+  searchUrl.searchParams.set('q', isin);
+  searchUrl.searchParams.set('region', 'US');
+
+  console.log(`[SEARCH-ALL-SYMBOLS] ================================================`);
+  console.log(`[SEARCH-ALL-SYMBOLS] Searching for ISIN: ${isin}`);
+  console.log(`[SEARCH-ALL-SYMBOLS] ================================================`);
+
+  try {
+    const response = await fetch(searchUrl.toString());
+    const responseText = await response.text();
+
+    if (!response.ok) {
+      console.error(`[SEARCH-ALL-SYMBOLS] ✗ HTTP Error: ${response.status} ${response.statusText}`);
+      throw new Error(`Wrapper service returned ${response.status}: ${responseText.substring(0, 200)}`);
+    }
+
+    let searchResult;
+    try {
+      searchResult = JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error(`Wrapper returned non-JSON response: ${responseText.substring(0, 200)}`);
+    }
+
+    const rawQuotes = searchResult.quotes || [];
+
+    if (rawQuotes.length === 0) {
+      throw new Error("No quotes found for ISIN");
+    }
+
+    // Parse all quotes
+    const validQuotes: z.infer<typeof QuoteSearchSchema>[] = [];
+    for (const rawQuote of rawQuotes) {
+      const parsed = QuoteSearchSchema.safeParse(rawQuote);
+      if (parsed.success) {
+        validQuotes.push(parsed.data);
+      }
+    }
+
+    if (validQuotes.length === 0) {
+      throw new Error("No valid quotes found for ISIN");
+    }
+
+    // Sort quotes by exchange priority
+    const sortedQuotes = sortQuotesByPriority(validQuotes, isin);
+    const allSymbols = sortedQuotes.map(q => q.symbol);
+
+    console.log(`[SEARCH-ALL-SYMBOLS] ✓ Found ${allSymbols.length} symbols: ${allSymbols.join(', ')}`);
+
+    return {
+      primarySymbol: allSymbols[0],
+      allSymbols,
+    };
+  } catch (error: any) {
+    console.error(`[SEARCH-ALL-SYMBOLS] ✗ Error for ISIN: ${isin}: ${error.message}`);
     throw error;
   }
 }

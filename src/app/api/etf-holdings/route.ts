@@ -5,6 +5,7 @@ import { cache } from "@/lib/cache";
 
 const QuerySchema = z.object({
   symbol: z.string().min(1).max(20),
+  symbols: z.string().optional(), // Comma-separated list of fallback symbols
   isin: z.string().min(8).max(12).optional(),
 });
 
@@ -23,41 +24,53 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { symbol, isin } = parsedQuery.data;
-  const cacheKey = `etf-holdings:${symbol}`;
+  const { symbol, symbols: symbolsParam, isin } = parsedQuery.data;
+
+  // Build list of symbols to try: primary symbol first, then fallbacks from 'symbols' param
+  const symbolsToTry: string[] = [symbol];
+  if (symbolsParam) {
+    const fallbackSymbols = symbolsParam.split(',').map(s => s.trim()).filter(s => s && s !== symbol);
+    symbolsToTry.push(...fallbackSymbols);
+  }
+
+  // Use ISIN as cache key if available (covers all symbol variants)
+  const cacheKey = isin ? `etf-holdings:${isin}` : `etf-holdings:${symbol}`;
 
   // Check cache first
   if (cache.has(cacheKey)) {
     const cached = cache.get(cacheKey);
     if (cached) {
-      console.log(`[ETF-HOLDINGS] ✓ Cache hit for symbol: ${symbol}`);
+      console.log(`[ETF-HOLDINGS] ✓ Cache hit for: ${cacheKey}`);
       return NextResponse.json(cached);
     }
   }
 
-  console.log(`[ETF-HOLDINGS] Cache miss for symbol: ${symbol}. Fetching...`);
+  console.log(`[ETF-HOLDINGS] Cache miss. Trying ${symbolsToTry.length} symbols: ${symbolsToTry.join(', ')}`);
 
-  try {
-    const holdings = await fetchETFHoldings(symbol, isin);
+  // Try each symbol in order until one works
+  for (const trySymbol of symbolsToTry) {
+    try {
+      console.log(`[ETF-HOLDINGS] Trying symbol: ${trySymbol}`);
+      const holdings = await fetchETFHoldings(trySymbol, isin);
 
-    if (!holdings) {
-      console.log(`[ETF-HOLDINGS] No holdings data for symbol: ${symbol}`);
-      return NextResponse.json(
-        { error: `No holdings data available for ${symbol}` },
-        { status: 404 }
-      );
+      if (holdings) {
+        // Cache the successful result
+        cache.set(cacheKey, { holdings, resolvedSymbol: trySymbol });
+        console.log(`[ETF-HOLDINGS] ✓ Successfully fetched holdings using symbol: ${trySymbol}`);
+
+        return NextResponse.json({ holdings, resolvedSymbol: trySymbol });
+      }
+
+      console.log(`[ETF-HOLDINGS] No holdings data for symbol: ${trySymbol}, trying next...`);
+    } catch (err: any) {
+      console.log(`[ETF-HOLDINGS] Error with symbol ${trySymbol}: ${err.message}, trying next...`);
     }
-
-    // Cache the result
-    cache.set(cacheKey, { holdings });
-    console.log(`[ETF-HOLDINGS] ✓ Successfully fetched holdings for ${symbol}`);
-
-    return NextResponse.json({ holdings });
-  } catch (err: any) {
-    console.error(`[ETF-HOLDINGS] ✗ Error fetching holdings for ${symbol}:`, err);
-    return NextResponse.json(
-      { error: err.message || "Unexpected error" },
-      { status: 500 }
-    );
   }
+
+  // All symbols failed
+  console.log(`[ETF-HOLDINGS] ✗ No holdings data available for any symbol`);
+  return NextResponse.json(
+    { error: `No holdings data available for ${symbol} (tried ${symbolsToTry.length} variants)` },
+    { status: 404 }
+  );
 }

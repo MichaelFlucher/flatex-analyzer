@@ -3,12 +3,17 @@ import { ETFHoldingsData } from "../types/etf-holdings";
 
 async function fetchETFHoldings(
   symbol: string,
+  allSymbols: string[],
   isin?: string
 ): Promise<ETFHoldingsData | null> {
   try {
     const params = new URLSearchParams({ symbol });
     if (isin) {
       params.set('isin', isin);
+    }
+    // Pass all symbols for fallback attempts
+    if (allSymbols.length > 1) {
+      params.set('symbols', allSymbols.join(','));
     }
     const res = await fetch(`/api/etf-holdings?${params.toString()}`);
     if (!res.ok) {
@@ -26,6 +31,7 @@ async function fetchETFHoldings(
 
 interface ETFHoldingsQuery {
   symbol: string;
+  allSymbols: string[];
   isin: string;
   isETF: boolean;
 }
@@ -33,11 +39,12 @@ interface ETFHoldingsQuery {
 /**
  * Hook to fetch ETF holdings for multiple symbols
  * Only fetches for symbols where isETF is true
+ * Uses allSymbols for fallback if primary symbol fails
  */
 export function useETFHoldingsBatch(queries: ETFHoldingsQuery[]) {
   const { data, progress } = useQueries({
-    queries: queries.map(({ symbol, isin, isETF }) => ({
-      queryKey: ["etf-holdings", symbol],
+    queries: queries.map(({ symbol, allSymbols, isin, isETF }) => ({
+      queryKey: ["etf-holdings", isin], // Use ISIN as key since symbol may change
       queryFn: async (): Promise<{
         symbol: string;
         holdings: ETFHoldingsData | null;
@@ -45,7 +52,7 @@ export function useETFHoldingsBatch(queries: ETFHoldingsQuery[]) {
         if (!isETF) {
           return { symbol, holdings: null };
         }
-        const holdings = await fetchETFHoldings(symbol, isin);
+        const holdings = await fetchETFHoldings(symbol, allSymbols, isin);
         return { symbol, holdings };
       },
       staleTime: 24 * 60 * 60 * 1000, // Cache for 24 hours
