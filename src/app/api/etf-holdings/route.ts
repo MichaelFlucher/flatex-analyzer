@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { fetchETFHoldings } from "@/features/dashboard/server/fetch-etf-holdings";
 import { cache } from "@/lib/cache";
+import { hardCodedIsinRemap } from "@/features/dashboard/utils/remove-known-symbol-wrappers";
 
 const QuerySchema = z.object({
   symbol: z.string().min(1).max(20),
@@ -26,10 +27,26 @@ export async function GET(req: NextRequest) {
 
   const { symbol, symbols: symbolsParam, isin } = parsedQuery.data;
 
-  // Build list of symbols to try: primary symbol first, then fallbacks from 'symbols' param
-  const symbolsToTry: string[] = [symbol];
+  // Build list of symbols to try
+  const symbolsToTry: string[] = [];
+
+  // If ISIN is provided and has a hardcoded remap, try that symbol first
+  if (isin) {
+    const remappedSymbol = hardCodedIsinRemap(isin);
+    if (remappedSymbol !== isin) {
+      console.log(`[ETF-HOLDINGS] ISIN ${isin} remapped to symbol: ${remappedSymbol}`);
+      symbolsToTry.push(remappedSymbol);
+    }
+  }
+
+  // Add the provided symbol (if not already added via remap)
+  if (!symbolsToTry.includes(symbol)) {
+    symbolsToTry.push(symbol);
+  }
+
+  // Add fallback symbols from 'symbols' param
   if (symbolsParam) {
-    const fallbackSymbols = symbolsParam.split(',').map(s => s.trim()).filter(s => s && s !== symbol);
+    const fallbackSymbols = symbolsParam.split(',').map(s => s.trim()).filter(s => s && !symbolsToTry.includes(s));
     symbolsToTry.push(...fallbackSymbols);
   }
 
