@@ -72,8 +72,8 @@ export function PieChartSwitcher({ dataSets }: GenericPieChartSwitcherProps) {
                 highlightScope: { fade: "global", highlight: "item" },
                 faded: { additionalRadius: -10, color: "gray" },
                 valueFormatter: (item, context) => {
-                  const pieItem = selectedData.data.find(d => d.value === item.value && d.label === context.dataIndex !== undefined ? selectedData.data[context.dataIndex]?.label : '');
-                  const actualItem = context.dataIndex !== undefined ? selectedData.data.sort((a, b) => b.value - a.value)[context.dataIndex] : null;
+                  const sortedData = selectedData.data.slice().sort((a, b) => b.value - a.value);
+                  const actualItem = context.dataIndex !== undefined ? sortedData[context.dataIndex] : null;
 
                   const valueStr = showValues
                     ? item.value.toLocaleString("de-DE", { style: "currency", currency: "EUR" })
