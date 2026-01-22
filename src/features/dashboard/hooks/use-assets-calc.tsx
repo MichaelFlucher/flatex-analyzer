@@ -198,7 +198,7 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
 
   const allTickers =
     tickerDataProgress === 1
-      ? assets.map((a) => a.tickerData?.symbol ?? "")
+      ? assets.map((a) => a.tickerData?.symbol).filter((s): s is string => !!s)
       : [];
 
   const { data: priceHistory, isLoading: priceHistoryIsLoading } =

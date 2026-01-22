@@ -57,11 +57,12 @@ export default function PerformanceChart() {
   const theme = useTheme();
 
   const firstTransactionDate = accountTransactions[0]?.Buchtag;
+  const hasValidDateRange = firstTransactionDate && dayjs(firstTransactionDate).isBefore(dayjs());
 
   const { data: priceData, isLoading } = usePriceHistory({
-    start: dayjs(firstTransactionDate).format(ISO_FORMAT),
-    end: dayjs().format(ISO_FORMAT),
-    tickers: tickers.map((t) => t.ticker),
+    start: hasValidDateRange ? dayjs(firstTransactionDate).format(ISO_FORMAT) : "",
+    end: hasValidDateRange ? dayjs().format(ISO_FORMAT) : "",
+    tickers: hasValidDateRange ? tickers.map((t) => t.ticker) : [],
   });
   const accountCashFlows = getAccountCashFlows(accountTransactions, 1);
   const [timeframe, setTimeframe] = useState<1 | 3 | 5 | "all">(1);

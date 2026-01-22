@@ -9,10 +9,16 @@ import { PieChart } from "@mui/x-charts";
 import ValueTypography from "./value-typography";
 import { useShowValues } from "../hooks/use-show-values";
 
+type PieContributor = {
+  name: string;
+  value: number;
+};
+
 type PieData = {
   id: string;
   label: string;
   value: number;
+  contributors?: PieContributor[];
 };
 
 type ChartDataSet = {
@@ -65,17 +71,48 @@ export function PieChartSwitcher({ dataSets }: GenericPieChartSwitcherProps) {
                 cornerRadius: 2,
                 highlightScope: { fade: "global", highlight: "item" },
                 faded: { additionalRadius: -10, color: "gray" },
-                valueFormatter: (value) => {
-                  return showValues ? value.value.toLocaleString("de-DE", {
-                    style: "currency",
-                    currency: "EUR",
-                  }) : ((value.value / totalValue) * 100).toFixed(2) + "%";
+                valueFormatter: (item, context) => {
+                  const sortedData = selectedData.data.slice().sort((a, b) => b.value - a.value);
+                  const actualItem = context.dataIndex !== undefined ? sortedData[context.dataIndex] : null;
+
+                  const valueStr = showValues
+                    ? item.value.toLocaleString("de-DE", { style: "currency", currency: "EUR" })
+                    : ((item.value / totalValue) * 100).toFixed(2) + "%";
+
+                  // Show contributors if available
+                  if (actualItem?.contributors && actualItem.contributors.length > 0) {
+                    const contributorLines = actualItem.contributors
+                      .sort((a, b) => b.value - a.value)
+                      .slice(0, 5) // Show top 5 contributors
+                      .map(c => `${c.name}: ${c.value.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}`);
+
+                    if (actualItem.contributors.length > 5) {
+                      contributorLines.push(`... and ${actualItem.contributors.length - 5} more`);
+                    }
+
+                    return `${valueStr}\n${contributorLines.join('\n')}`;
+                  }
+
+                  return valueStr;
                 },
               },
             ]}
             width={200}
             height={200}
             hideLegend
+            slotProps={{
+              tooltip: {
+                sx: {
+                  "& .MuiChartsTooltip-valueCell": {
+                    whiteSpace: "pre-line",
+                    minWidth: 180,
+                  },
+                  "& .MuiChartsTooltip-table": {
+                    minWidth: 220,
+                  },
+                },
+              },
+            }}
           />
           <ValueTypography
             variant="body1"

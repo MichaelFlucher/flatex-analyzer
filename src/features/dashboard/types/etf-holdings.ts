@@ -8,6 +8,7 @@ export const ETFHoldingSchema = z.object({
   symbol: z.string(),
   holdingName: z.string(),
   holdingPercent: z.number(), // Weight in ETF (0-100)
+  country: z.string().optional(), // Country of the holding (enriched from ticker info)
 });
 
 export type ETFHolding = z.infer<typeof ETFHoldingSchema>;
