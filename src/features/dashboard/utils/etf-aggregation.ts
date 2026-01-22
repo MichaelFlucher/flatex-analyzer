@@ -69,20 +69,57 @@ export function getETFSectorBreakdown(
 }
 
 /**
- * Note: Yahoo Finance doesn't provide country breakdown for ETFs
- * This function returns "ETF" as a placeholder until we have country data
+ * Calculates weighted country breakdown for an ETF position
+ * Uses the country field from each holding (enriched by the wrapper)
  *
- * Future implementation could:
- * 1. Look up each holding's country individually
- * 2. Use external data source for ETF country breakdown
+ * @param positionValue Total position value in EUR
+ * @param holdings ETF holdings data with country info for each holding
+ * @returns Map of country name -> weighted value in EUR
  */
 export function getETFCountryBreakdown(
   positionValue: number,
-  _holdings: ETFHoldingsData
+  holdings: ETFHoldingsData
 ): Map<string, number> {
-  // Country breakdown not available from Yahoo Finance sector_weightings
-  // Return as "ETF" for now
   const breakdown = new Map<string, number>();
-  breakdown.set("ETF", positionValue);
+
+  if (!holdings.topHoldings || holdings.topHoldings.length === 0) {
+    // No holdings data available, return as "ETF" fallback
+    breakdown.set("ETF", positionValue);
+    return breakdown;
+  }
+
+  // Check if any holdings have country data
+  const holdingsWithCountry = holdings.topHoldings.filter(h => h.country);
+  if (holdingsWithCountry.length === 0) {
+    // No country data available, return as "ETF" fallback
+    breakdown.set("ETF", positionValue);
+    return breakdown;
+  }
+
+  // Calculate total weight of holdings with country data
+  let totalWeight = 0;
+  for (const holding of holdings.topHoldings) {
+    if (holding.country && holding.holdingPercent > 0) {
+      totalWeight += holding.holdingPercent;
+    }
+  }
+
+  // Distribute position value across countries based on holding weights
+  for (const holding of holdings.topHoldings) {
+    if (!holding.country || holding.holdingPercent <= 0) continue;
+
+    // Normalize weight relative to total known weights
+    const normalizedWeight = holding.holdingPercent / totalWeight;
+    const value = positionValue * normalizedWeight;
+
+    const country = holding.country;
+    breakdown.set(country, (breakdown.get(country) ?? 0) + value);
+  }
+
+  // If we have no breakdown data, fallback to "ETF"
+  if (breakdown.size === 0) {
+    breakdown.set("ETF", positionValue);
+  }
+
   return breakdown;
 }
