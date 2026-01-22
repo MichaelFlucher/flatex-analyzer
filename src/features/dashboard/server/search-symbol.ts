@@ -96,23 +96,37 @@ function sortQuotesByPriority(quotes: z.infer<typeof QuoteSearchSchema>[], isin:
   const sortedQuotes: z.infer<typeof QuoteSearchSchema>[] = [];
   const usedSymbols = new Set<string>();
 
-  // First, add quotes from priority exchanges in order
-  for (const exchange of priorityExchanges) {
-    const match = quotes.find(q => q.exchange === exchange && !usedSymbols.has(q.symbol));
-    if (match) {
-      sortedQuotes.push(match);
-      usedSymbols.add(match.symbol);
-      console.log(`[SEARCH-SYMBOL] Priority ${sortedQuotes.length}: ${match.symbol} (exchange: ${exchange})`);
-    }
-  }
-
-  // Then, add remaining quotes that weren't matched by priority
-  for (const quote of quotes) {
+  // Helper to add unique quotes
+  const addQuote = (quote: z.infer<typeof QuoteSearchSchema>, type: string) => {
     if (!usedSymbols.has(quote.symbol)) {
       sortedQuotes.push(quote);
       usedSymbols.add(quote.symbol);
-      console.log(`[SEARCH-SYMBOL] Fallback ${sortedQuotes.length}: ${quote.symbol} (exchange: ${quote.exchange})`);
+      console.log(`[SEARCH-SYMBOL] ${type} ${sortedQuotes.length}: ${quote.symbol} (exchange: ${quote.exchange}, type: ${quote.quoteType})`);
     }
+  };
+
+  // 1. Priority Exchanges + ETF/EQUITY type
+  for (const exchange of priorityExchanges) {
+    const match = quotes.find(q => 
+      q.exchange === exchange && 
+      (q.quoteType === 'ETF' || q.quoteType === 'EQUITY') && 
+      !usedSymbols.has(q.symbol)
+    );
+    if (match) addQuote(match, "Priority ETF");
+  }
+
+  // 2. Priority Exchanges + Other types (e.g. MUTUALFUND)
+  for (const exchange of priorityExchanges) {
+    const match = quotes.find(q => 
+      q.exchange === exchange && 
+      !usedSymbols.has(q.symbol)
+    );
+    if (match) addQuote(match, "Priority Other");
+  }
+
+  // 3. Remaining quotes
+  for (const quote of quotes) {
+    addQuote(quote, "Fallback");
   }
 
   return sortedQuotes;
