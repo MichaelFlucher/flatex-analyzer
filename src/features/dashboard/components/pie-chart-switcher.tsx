@@ -84,10 +84,10 @@ export function PieChartSwitcher({ dataSets }: GenericPieChartSwitcherProps) {
                     const contributorLines = actualItem.contributors
                       .sort((a, b) => b.value - a.value)
                       .slice(0, 5) // Show top 5 contributors
-                      .map(c => `  ${c.name}: ${c.value.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}`);
+                      .map(c => `${c.name}: ${c.value.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}`);
 
                     if (actualItem.contributors.length > 5) {
-                      contributorLines.push(`  ... and ${actualItem.contributors.length - 5} more`);
+                      contributorLines.push(`... and ${actualItem.contributors.length - 5} more`);
                     }
 
                     return `${valueStr}\n${contributorLines.join('\n')}`;
@@ -100,6 +100,19 @@ export function PieChartSwitcher({ dataSets }: GenericPieChartSwitcherProps) {
             width={200}
             height={200}
             hideLegend
+            slotProps={{
+              tooltip: {
+                sx: {
+                  "& .MuiChartsTooltip-valueCell": {
+                    whiteSpace: "pre-line",
+                    minWidth: 180,
+                  },
+                  "& .MuiChartsTooltip-table": {
+                    minWidth: 220,
+                  },
+                },
+              },
+            }}
           />
           <ValueTypography
             variant="body1"
