@@ -5,6 +5,14 @@ import { z } from "zod";
 
 // Exchange priority lists based on ISIN country code
 // EU ISINs should prefer European exchanges, US ISINs should prefer US exchanges
+const NORDIC_EXCHANGES = [
+  'CPH',  // Copenhagen (Denmark)
+  'STO',  // Stockholm (Sweden)
+  'OSL',  // Oslo (Norway)
+  'HEL',  // Helsinki (Finland)
+  'ICE',  // Iceland
+];
+
 const EU_PRIORITY_EXCHANGES = [
   'GER',  // XETRA (Germany)
   'FRA',  // Frankfurt
@@ -22,7 +30,11 @@ const EU_PRIORITY_EXCHANGES = [
   'SWX',  // Swiss Exchange
   'VIE',  // Vienna
   'MCE',  // Madrid
+  ...NORDIC_EXCHANGES,  // Include Nordic exchanges
 ];
+
+// Nordic countries should prioritize their local exchanges first
+const NORDIC_COUNTRY_CODES = ['DK', 'SE', 'NO', 'FI', 'IS'];
 
 const US_PRIORITY_EXCHANGES = [
   'NYQ',  // NYSE
@@ -59,9 +71,16 @@ const US_COUNTRY_CODES = ['US'];
 /**
  * Determines the priority exchanges based on the ISIN country code.
  * EU ISINs prefer European exchanges, US ISINs prefer US exchanges.
+ * Nordic ISINs prioritize their local Nordic exchanges first.
  */
 function getPriorityExchanges(isin: string): string[] {
   const countryCode = isin.substring(0, 2).toUpperCase();
+
+  // Nordic countries should prioritize Nordic exchanges first
+  if (NORDIC_COUNTRY_CODES.includes(countryCode)) {
+    // Put Nordic exchanges first, then other EU exchanges
+    return [...NORDIC_EXCHANGES, ...EU_PRIORITY_EXCHANGES.filter(e => !NORDIC_EXCHANGES.includes(e))];
+  }
 
   if (EU_COUNTRY_CODES.includes(countryCode)) {
     return EU_PRIORITY_EXCHANGES;
