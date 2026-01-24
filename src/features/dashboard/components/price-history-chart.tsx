@@ -68,10 +68,28 @@ export default function PriceHistoryChart({
       color: colors["Price"] || orange[300],
     };
 
-    const points: PointAnnotation[] = keyEvents.map(({ date, price, type }) => {
+    const points: PointAnnotation[] = keyEvents.map(({ date, type }) => {
       const iso = dayjs(date).format(ISO_FORMAT);
       const idx = isoIndex.get(iso);
-      const y = price ?? (idx !== undefined ? prices[idx] : null);
+
+      // Always use the price from the chart's price history so markers appear on the line
+      let y: number | null = idx !== undefined ? prices[idx] : null;
+
+      // If no exact date match, find the closest date in the price history
+      if (y == null && dates.length > 0) {
+        const targetTime = new Date(date).getTime();
+        let closestIdx = 0;
+        let closestDiff = Math.abs(dates[0].getTime() - targetTime);
+        for (let i = 1; i < dates.length; i++) {
+          const diff = Math.abs(dates[i].getTime() - targetTime);
+          if (diff < closestDiff) {
+            closestDiff = diff;
+            closestIdx = i;
+          }
+        }
+        y = prices[closestIdx];
+      }
+
       const color = colors[type] ?? cyan[300];
       return {
         x: new Date(date).getTime(),
