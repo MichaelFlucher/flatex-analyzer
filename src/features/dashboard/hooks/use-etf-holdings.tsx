@@ -67,8 +67,10 @@ export function useETFHoldingsBatch(queries: ETFHoldingsQuery[]) {
     combine: (results) => {
       const successfulResults = results.filter((r) => r.status === "success");
       const errorResults = results.filter((r) => r.status === "error");
-      // Count both success AND error as "completed" for progress calculation
-      const completedResults = results.filter((r) => r.status === "success" || r.status === "error");
+      // Count as "completed": success, error, OR disabled queries (fetchStatus === 'idle' means never started)
+      const completedResults = results.filter(
+        (r) => r.status === "success" || r.status === "error" || r.fetchStatus === "idle"
+      );
 
       // Collect error details
       const errors: ETFHoldingsError[] = errorResults.map((r) => {
