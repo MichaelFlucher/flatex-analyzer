@@ -226,7 +226,7 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
     return conversionRates[closestDate];
   }
 
-  if (!priceHistoryIsLoading && priceHistory) {
+  if (!priceHistoryIsLoading && priceHistory && !conversionRatesIsLoading && conversionRates?.rates) {
     assets.forEach((asset) => {
       const ticker = asset.tickerData?.symbol;
       if (ticker && priceHistory.prices[ticker]) {

@@ -21,14 +21,14 @@ export function convertToEuroPrice(
   }
 
   if (!currencies) {
-    console.warn(`Conversion rates not available for ${currency}`);
-    return 0;
+    console.warn(`Conversion rates not available for ${currency}, returning unconverted price`);
+    return normalizedPrice;
   }
 
   const conversionRate = currencies[normalizedCurrency];
   if (!conversionRate) {
-    console.warn(`Conversion rate for ${currency} not found`);
-    return 0;
+    console.warn(`Conversion rate for ${currency} not found, returning unconverted price`);
+    return normalizedPrice;
   }
 
   return normalizedPrice / conversionRate;
