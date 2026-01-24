@@ -6,7 +6,7 @@ import {
 } from "./use-depot-item-details";
 import { usePriceHistory } from "./use-price-history";
 import { useTickerDatas } from "./use-ticker-data";
-import { useETFHoldingsBatch } from "./use-etf-holdings";
+import { useETFHoldingsBatch, ETFHoldingsError } from "./use-etf-holdings";
 import { convertToEuroPrice } from "../utils/euro-price-conversion";
 import { Asset } from "../types/asset";
 import { DepotItem } from "../types/depot-item";
@@ -163,7 +163,7 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
     return { symbol, allSymbols, isin: asset.isin, isETF };
   });
 
-  const { data: etfHoldingsData, progress: etfHoldingsProgress } =
+  const { data: etfHoldingsData, progress: etfHoldingsProgress, errors: etfHoldingsErrors } =
     useETFHoldingsBatch(etfHoldingsQueries);
 
   const assets: Asset[] = mergedAssets.map((asset) => {
@@ -269,5 +269,6 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
       priceHistoryIsLoading
     ),
     assets,
+    etfHoldingsErrors,
   };
 }

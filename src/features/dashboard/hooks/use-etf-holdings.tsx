@@ -41,8 +41,14 @@ interface ETFHoldingsQuery {
  * Only fetches for symbols where isETF is true
  * Uses allSymbols for fallback if primary symbol fails
  */
+export interface ETFHoldingsError {
+  symbol: string;
+  isin: string;
+  error: string;
+}
+
 export function useETFHoldingsBatch(queries: ETFHoldingsQuery[]) {
-  const { data, progress } = useQueries({
+  const result = useQueries({
     queries: queries.map(({ symbol, allSymbols, isin, isETF }) => ({
       queryKey: ["etf-holdings", isin], // Use ISIN as key since symbol may change
       queryFn: async (): Promise<{
@@ -60,15 +66,32 @@ export function useETFHoldingsBatch(queries: ETFHoldingsQuery[]) {
     })),
     combine: (results) => {
       const successfulResults = results.filter((r) => r.status === "success");
+      const errorResults = results.filter((r) => r.status === "error");
+      // Count both success AND error as "completed" for progress calculation
+      const completedResults = results.filter((r) => r.status === "success" || r.status === "error");
+
+      // Collect error details
+      const errors: ETFHoldingsError[] = errorResults.map((r) => {
+        const queryIndex = results.indexOf(r);
+        const query = queries[queryIndex];
+        return {
+          symbol: query?.symbol || `Query ${queryIndex}`,
+          isin: query?.isin || 'unknown',
+          error: r.error instanceof Error ? r.error.message : String(r.error),
+        };
+      });
+
       return {
         data: successfulResults.map((result) => result.data),
-        progress: results.length > 0 ? successfulResults.length / results.length : 1,
+        progress: results.length > 0 ? completedResults.length / results.length : 1,
+        errors,
       };
     },
   });
 
   return {
-    data,
-    progress,
+    data: result.data ?? [],
+    progress: result.progress ?? 1,
+    errors: result.errors ?? [],
   };
 }

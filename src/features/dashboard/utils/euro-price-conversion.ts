@@ -1,8 +1,12 @@
 export function convertToEuroPrice(
   price: number,
-  currencies: Record<string, number>,
+  currencies: Record<string, number> | null,
   currency: string
 ): number {
+  if (!currency) {
+    return price;
+  }
+
   let normalizedPrice = price;
   let normalizedCurrency = currency.toUpperCase();
 
@@ -14,6 +18,11 @@ export function convertToEuroPrice(
 
   if (normalizedCurrency === "EUR") {
     return normalizedPrice;
+  }
+
+  if (!currencies) {
+    console.warn(`Conversion rates not available for ${currency}`);
+    return 0;
   }
 
   const conversionRate = currencies[normalizedCurrency];

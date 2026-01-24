@@ -104,12 +104,11 @@ export default function PerformanceChart() {
         };
       })
     );*/
-    return toApexSeriesData(
-      accumulatedNetWorth.filter(
-        (d) => timeframe === "all" || d.date >= timeframeToDate(timeframe)
-      )
+    const filtered = accumulatedNetWorth.filter(
+      (d) => timeframe === "all" || d.date >= timeframeToDate(timeframe)
     );
-  }, [accumulatedNetWorth, accountCashFlows, timeframe]);
+    return toApexSeriesData(filtered);
+  }, [accumulatedNetWorth, accountCashFlows, timeframe, progress.state]);
 
   const benchmarkSeries = useMemo(() => {
     if (!priceData?.dates || !priceData.prices) return [];

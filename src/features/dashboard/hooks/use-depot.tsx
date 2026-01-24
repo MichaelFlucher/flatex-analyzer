@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 import { extractISINs } from "../utils/extract-isins";
 import { ProgressDetails, useAssetsCalc } from "./use-assets-calc";
+import { ETFHoldingsError } from "./use-etf-holdings";
 import { ParsedAccountTransaction } from "../types/account-transaction";
 import { Asset } from "../types/asset";
 import { DepotItem } from "../types/depot-item";
@@ -70,6 +71,7 @@ type DepotContextType = {
   accountTransactions: ParsedAccountTransaction[];
   assets: Asset[];
   progress: ProgressDetails;
+  etfHoldingsErrors: ETFHoldingsError[];
 };
 
 const DepotContext = createContext<DepotContextType | null>(null);
@@ -84,7 +86,7 @@ export function DepotProvider({
   accountTransactions: ParsedAccountTransaction[];
 }) {
   const depotItems = getDepotItems(depotTransactions, accountTransactions);
-  const { assets, progress } = useAssetsCalc(depotItems);
+  const { assets, progress, etfHoldingsErrors } = useAssetsCalc(depotItems);
 
   return (
     <DepotContext.Provider
@@ -94,6 +96,7 @@ export function DepotProvider({
         accountTransactions,
         assets,
         progress,
+        etfHoldingsErrors,
       }}
     >
       {children}
