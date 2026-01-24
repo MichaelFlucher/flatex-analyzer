@@ -6,7 +6,7 @@ import {
 } from "./use-depot-item-details";
 import { usePriceHistory } from "./use-price-history";
 import { useTickerDatas } from "./use-ticker-data";
-import { useETFHoldingsBatch } from "./use-etf-holdings";
+import { useETFHoldingsBatch, ETFHoldingsError } from "./use-etf-holdings";
 import { convertToEuroPrice } from "../utils/euro-price-conversion";
 import { Asset } from "../types/asset";
 import { DepotItem } from "../types/depot-item";
@@ -163,7 +163,7 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
     return { symbol, allSymbols, isin: asset.isin, isETF };
   });
 
-  const { data: etfHoldingsData, progress: etfHoldingsProgress } =
+  const { data: etfHoldingsData, progress: etfHoldingsProgress, errors: etfHoldingsErrors } =
     useETFHoldingsBatch(etfHoldingsQueries);
 
   const assets: Asset[] = mergedAssets.map((asset) => {
@@ -226,7 +226,7 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
     return conversionRates[closestDate];
   }
 
-  if (!priceHistoryIsLoading && priceHistory) {
+  if (!priceHistoryIsLoading && priceHistory && !conversionRatesIsLoading && conversionRates?.rates) {
     assets.forEach((asset) => {
       const ticker = asset.tickerData?.symbol;
       if (ticker && priceHistory.prices[ticker]) {
@@ -235,26 +235,37 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
             priceHistory.dates[0],
             conversionRates.rates
           );
-        asset.priceHistory = priceHistory.prices[ticker].map((price, index) => {
-          if (ratesMap.has(priceHistory.dates[index])) {
-            lastFoundConversionRates = ratesMap.get(priceHistory.dates[index]);
-          }
-          return {
-            date: priceHistory.dates[index],
-            price:
-              price === 0 && index > 0
-                ? convertToEuroPrice(
-                    priceHistory.prices[ticker][index - 1],
-                    lastFoundConversionRates,
-                    asset.tickerData?.currency
-                  )
-                : convertToEuroPrice(
-                    price,
-                    lastFoundConversionRates,
-                    asset.tickerData?.currency
-                  ),
-          };
-        });
+        asset.priceHistory = priceHistory.prices[ticker]
+          .map((price, index) => {
+            if (ratesMap.has(priceHistory.dates[index])) {
+              lastFoundConversionRates = ratesMap.get(priceHistory.dates[index]);
+            }
+
+            // Skip null/undefined prices from the API
+            if (price == null) {
+              return null;
+            }
+
+            // If price is 0 and we have a previous price, use that instead
+            const effectivePrice = (price === 0 && index > 0)
+              ? priceHistory.prices[ticker][index - 1]
+              : price;
+
+            // Skip if effective price is still null/undefined/0
+            if (effectivePrice == null || effectivePrice === 0) {
+              return null;
+            }
+
+            return {
+              date: priceHistory.dates[index],
+              price: convertToEuroPrice(
+                effectivePrice,
+                lastFoundConversionRates,
+                asset.tickerData?.currency
+              ),
+            };
+          })
+          .filter((entry): entry is { date: string; price: number } => entry !== null);
       } else {
         asset.priceHistory = [];
       }
@@ -269,5 +280,6 @@ export function useAssetsCalc(depotItems: DepotItem[]) {
       priceHistoryIsLoading
     ),
     assets,
+    etfHoldingsErrors,
   };
 }

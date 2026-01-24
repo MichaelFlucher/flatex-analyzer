@@ -7,6 +7,10 @@ services:
       dockerfile: Dockerfile
     container_name: yf-wrapper
     restart: unless-stopped
+    depends_on:
+      - pg-data
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@pg-data:5432/mydb
   dashboard:
     build:
       context: .

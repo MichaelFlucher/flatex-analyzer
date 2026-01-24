@@ -5,6 +5,14 @@ import { z } from "zod";
 
 // Exchange priority lists based on ISIN country code
 // EU ISINs should prefer European exchanges, US ISINs should prefer US exchanges
+const NORDIC_EXCHANGES = [
+  'CPH',  // Copenhagen (Denmark)
+  'STO',  // Stockholm (Sweden)
+  'OSL',  // Oslo (Norway)
+  'HEL',  // Helsinki (Finland)
+  'ICE',  // Iceland
+];
+
 const EU_PRIORITY_EXCHANGES = [
   'GER',  // XETRA (Germany)
   'FRA',  // Frankfurt
@@ -22,7 +30,11 @@ const EU_PRIORITY_EXCHANGES = [
   'SWX',  // Swiss Exchange
   'VIE',  // Vienna
   'MCE',  // Madrid
+  ...NORDIC_EXCHANGES,  // Include Nordic exchanges
 ];
+
+// Nordic countries should prioritize their local exchanges first
+const NORDIC_COUNTRY_CODES = ['DK', 'SE', 'NO', 'FI', 'IS'];
 
 const US_PRIORITY_EXCHANGES = [
   'NYQ',  // NYSE
@@ -59,9 +71,16 @@ const US_COUNTRY_CODES = ['US'];
 /**
  * Determines the priority exchanges based on the ISIN country code.
  * EU ISINs prefer European exchanges, US ISINs prefer US exchanges.
+ * Nordic ISINs prioritize their local Nordic exchanges first.
  */
 function getPriorityExchanges(isin: string): string[] {
   const countryCode = isin.substring(0, 2).toUpperCase();
+
+  // Nordic countries should prioritize Nordic exchanges first
+  if (NORDIC_COUNTRY_CODES.includes(countryCode)) {
+    // Put Nordic exchanges first, then other EU exchanges
+    return [...NORDIC_EXCHANGES, ...EU_PRIORITY_EXCHANGES.filter(e => !NORDIC_EXCHANGES.includes(e))];
+  }
 
   if (EU_COUNTRY_CODES.includes(countryCode)) {
     return EU_PRIORITY_EXCHANGES;
@@ -96,23 +115,37 @@ function sortQuotesByPriority(quotes: z.infer<typeof QuoteSearchSchema>[], isin:
   const sortedQuotes: z.infer<typeof QuoteSearchSchema>[] = [];
   const usedSymbols = new Set<string>();
 
-  // First, add quotes from priority exchanges in order
-  for (const exchange of priorityExchanges) {
-    const match = quotes.find(q => q.exchange === exchange && !usedSymbols.has(q.symbol));
-    if (match) {
-      sortedQuotes.push(match);
-      usedSymbols.add(match.symbol);
-      console.log(`[SEARCH-SYMBOL] Priority ${sortedQuotes.length}: ${match.symbol} (exchange: ${exchange})`);
-    }
-  }
-
-  // Then, add remaining quotes that weren't matched by priority
-  for (const quote of quotes) {
+  // Helper to add unique quotes
+  const addQuote = (quote: z.infer<typeof QuoteSearchSchema>, type: string) => {
     if (!usedSymbols.has(quote.symbol)) {
       sortedQuotes.push(quote);
       usedSymbols.add(quote.symbol);
-      console.log(`[SEARCH-SYMBOL] Fallback ${sortedQuotes.length}: ${quote.symbol} (exchange: ${quote.exchange})`);
+      console.log(`[SEARCH-SYMBOL] ${type} ${sortedQuotes.length}: ${quote.symbol} (exchange: ${quote.exchange}, type: ${quote.quoteType})`);
     }
+  };
+
+  // 1. Priority Exchanges + ETF/EQUITY type
+  for (const exchange of priorityExchanges) {
+    const match = quotes.find(q => 
+      q.exchange === exchange && 
+      (q.quoteType === 'ETF' || q.quoteType === 'EQUITY') && 
+      !usedSymbols.has(q.symbol)
+    );
+    if (match) addQuote(match, "Priority ETF");
+  }
+
+  // 2. Priority Exchanges + Other types (e.g. MUTUALFUND)
+  for (const exchange of priorityExchanges) {
+    const match = quotes.find(q => 
+      q.exchange === exchange && 
+      !usedSymbols.has(q.symbol)
+    );
+    if (match) addQuote(match, "Priority Other");
+  }
+
+  // 3. Remaining quotes
+  for (const quote of quotes) {
+    addQuote(quote, "Fallback");
   }
 
   return sortedQuotes;
