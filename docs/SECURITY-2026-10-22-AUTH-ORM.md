@@ -41,3 +41,9 @@ The full audit still reports **10 package findings (1 critical, 1 high, 8 modera
 - `next` and `@mui/material-nextjs` aggregate the PostCSS dependency finding; this is not a new Next RSC version regression.
 
 A separate tooling refresh may address these. No `npm audit fix --force`, unrelated Next major, schema change, production push/deploy or Docker image build/push was performed by this preparation worker. Parent must review/integrate and verify the production rollout.
+
+Production-dependency-only audit (`npm audit --omit=dev`) reports **9 findings (0 critical, 1 high, 8 moderate)**; the critical `tar` path is development/build dependencies. The full install audit above includes it intentionally.
+
+## Client typing compatibility
+
+Better Auth1.6 requires a concrete client options type in this project: `createAuthClient({})` preserves existing default runtime behavior and fixes `useSession().data` inference from the widened no-argument generic. Full `tsc --noEmit --incremental false` passes without type casts, ignored errors or changing project strictness. Server auth configuration is untouched.
